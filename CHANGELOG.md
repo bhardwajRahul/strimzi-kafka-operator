@@ -2,6 +2,7 @@
 
 ## 0.47.0
 
+* Adding progress tracking for Cruise Control rebalances
 * Add support for Kafka 3.9.1
 * Fixed MirrorMaker 2 client rack init container override being ignored.
 * Support for Kubernetes Image Volumes to mount custom plugins
@@ -36,6 +37,7 @@
 * Update OAuth library to 0.16.2.
 * Update HTTP bridge to 0.32.0.
 * Kubernetes events emitted during a Pod restart updated to have the Kafka resource as the `regardingObject` and the Pod in the `related` field.
+* Kafka Connect truststore and keystore configurations now uses Kafka Kubernetes Config Provider to load PEM certificates directly from secrets.
 
 ### Major changes, deprecations and removals
 
@@ -61,6 +63,8 @@
 * Kubernetes events for Pod restarts no longer have the Pod as the `regardingObject`.
   If you are using `regardingObject` as a `field-selector` for listing events you must update the selector to specify the Kafka resource instead.
 * From Kafka 4.0.0, to enable the JMXReporter you must either enable metrics in `.spec.kafka.metrics`, or explicitly add JMXReporter in `metric.reporters`.
+* KafkaConnect now uses PEM files instead of P12/JKS for keystore and truststore. 
+  * If you override "ssl.truststore.location" and "ssl.keystore.location" in your Connector configurations, then you would need update them to override "ssl.truststore.certificates" and "ssl.keystore.certificate.chain" with PEM files instead.
 
 ## 0.45.0
 
@@ -77,7 +81,7 @@
 ### Major changes, deprecations and removals
 
 * **Strimzi 0.45 is the last minor Strimzi version with support for ZooKeeper-based Apache Kafka clusters and MirrorMaker 1 deployments.**
-  **Please make sure to [migrate to KRaft](https://strimzi.io/docs/operators/latest/full/deploying.html#assembly-kraft-mode-str) and MirrorMaker 2 before upgrading to Strimzi 0.46 or newer.**
+  **Please make sure to [migrate to KRaft](https://strimzi.io/docs/operators/0.45.0/full/deploying.html#assembly-kraft-mode-str) and MirrorMaker 2 before upgrading to Strimzi 0.46 or newer.**
 * **Strimzi 0.45 is the last Strimzi version to include the [Strimzi EnvVar Configuration Provider](https://github.com/strimzi/kafka-env-var-config-provider) (deprecated in Strimzi 0.38.0) and [Strimzi MirrorMaker 2 Extensions](https://github.com/strimzi/mirror-maker-2-extensions) (deprecated in Strimzi 0.28.0).**
   Please use the Apache Kafka [EnvVarConfigProvider](https://github.com/strimzi/kafka-env-var-config-provider?tab=readme-ov-file#deprecation-notice) and [Identity Replication Policy](https://github.com/strimzi/mirror-maker-2-extensions?tab=readme-ov-file#identity-replication-policy) instead. 
 

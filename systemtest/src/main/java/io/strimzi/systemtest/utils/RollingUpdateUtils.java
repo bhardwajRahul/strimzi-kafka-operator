@@ -10,12 +10,9 @@ import io.strimzi.api.kafka.model.kafka.Kafka;
 import io.strimzi.api.kafka.model.mirrormaker2.KafkaMirrorMaker2;
 import io.strimzi.operator.common.model.Labels;
 import io.strimzi.systemtest.TestConstants;
-import io.strimzi.systemtest.resources.ResourceManager;
+import io.strimzi.systemtest.labels.LabelSelectors;
 import io.strimzi.systemtest.resources.ResourceOperation;
-import io.strimzi.systemtest.resources.crd.KafkaConnectResource;
-import io.strimzi.systemtest.resources.crd.KafkaMirrorMaker2Resource;
-import io.strimzi.systemtest.resources.crd.KafkaResource;
-import io.strimzi.systemtest.resources.crd.StrimziPodSetResource;
+import io.strimzi.systemtest.resources.crd.KafkaComponents;
 import io.strimzi.systemtest.utils.kafkaUtils.KafkaConnectUtils;
 import io.strimzi.systemtest.utils.kafkaUtils.KafkaMirrorMaker2Utils;
 import io.strimzi.systemtest.utils.kafkaUtils.KafkaUtils;
@@ -89,14 +86,12 @@ public class RollingUpdateUtils {
     }
 
     public static Map<String, String> waitTillComponentHasRolledAndPodsReady(String namespaceName, LabelSelector selector, int expectedPods, Map<String, String> snapshot) {
-        String clusterName = selector.getMatchLabels().get(Labels.STRIMZI_CLUSTER_LABEL);
         String componentName = getComponentNameFromLabelSelector(selector);
 
         waitTillComponentHasRolled(namespaceName, selector, snapshot);
 
         LOGGER.info("Waiting for {} Pod(s) of {}/{} to be ready", expectedPods, namespaceName, componentName);
-        PodUtils.waitForPodsReady(namespaceName, selector, expectedPods, true,
-            () -> ResourceManager.logCurrentResourceStatus(KafkaResource.kafkaClient().inNamespace(namespaceName).withName(clusterName).get()));
+        PodUtils.waitForPodsReady(namespaceName, selector, expectedPods, true);
 
         return PodUtils.podSnapshot(namespaceName, selector);
     }
@@ -162,18 +157,14 @@ public class RollingUpdateUtils {
 
         LOGGER.info("Waiting for {} Pod(s) of {}/{} to be ready", expectedPods, namespaceName, componentName);
 
-        final Runnable componentLogAfterTimeout;
         final BooleanSupplier componentReadinessStatus;
 
         if (selector.getMatchLabels() != null && selector.getMatchLabels().containsKey(Labels.STRIMZI_KIND_LABEL)) {
             if (selector.getMatchLabels().get(Labels.STRIMZI_KIND_LABEL).equals(KafkaConnect.RESOURCE_KIND)) {
-                componentLogAfterTimeout = () -> ResourceManager.logCurrentResourceStatus(KafkaConnectResource.kafkaConnectClient().inNamespace(namespaceName).withName(clusterName).get());
                 componentReadinessStatus = () -> KafkaConnectUtils.waitForConnectReady(namespaceName, clusterName);
             } else if (selector.getMatchLabels().get(Labels.STRIMZI_KIND_LABEL).equals(KafkaMirrorMaker2.RESOURCE_KIND)) {
-                componentLogAfterTimeout = () -> ResourceManager.logCurrentResourceStatus(KafkaMirrorMaker2Resource.kafkaMirrorMaker2Client().inNamespace(namespaceName).withName(clusterName).get());
                 componentReadinessStatus = () -> KafkaMirrorMaker2Utils.waitForKafkaMirrorMaker2Ready(namespaceName, clusterName);
             } else if (selector.getMatchLabels().get(Labels.STRIMZI_KIND_LABEL).equals(Kafka.RESOURCE_KIND)) {
-                componentLogAfterTimeout = () -> ResourceManager.logCurrentResourceStatus(KafkaResource.kafkaClient().inNamespace(namespaceName).withName(clusterName).get());
                 componentReadinessStatus = () -> KafkaUtils.waitForKafkaReady(namespaceName, clusterName);
             } else {
                 throw new RuntimeException("Waiting for such component (" + selector.getMatchLabels().get(Labels.STRIMZI_KIND_LABEL) + ")  is not supported.");
@@ -183,7 +174,7 @@ public class RollingUpdateUtils {
         }
 
         // 1. wait for readiness Pods
-        PodUtils.waitForPodsReady(namespaceName, selector, expectedPods, true, componentLogAfterTimeout);
+        PodUtils.waitForPodsReady(namespaceName, selector, expectedPods, true);
 
         // 2. wait for readiness of the status
         StUtils.waitUntilSupplierIsSatisfied("component %s/%s readiness".formatted(namespaceName, componentName), componentReadinessStatus);
@@ -194,12 +185,15 @@ public class RollingUpdateUtils {
         // not need to be final because reference to the array does not get another array assigned
         int[] i = {0};
 
+        LOGGER.debug("Waiting for Pods {}/{} to remain stable for {} second(s)", namespaceName, pods.toString(),
+            TestConstants.GLOBAL_STABILIZATION_TIME);
+
         TestUtils.waitFor("Pods to remain stable and rolling update not to be triggered", TestConstants.GLOBAL_POLL_INTERVAL, TestConstants.GLOBAL_TIMEOUT,
             () -> {
                 if (!componentHasRolled(namespaceName, selector, pods)) {
-                    LOGGER.info("Pods {}/{} did not roll. Must remain stable for: {} second(s)", namespaceName, pods.toString(),
-                        TestConstants.GLOBAL_RECONCILIATION_COUNT - i[0]);
-                    return i[0]++ == TestConstants.GLOBAL_RECONCILIATION_COUNT;
+                    LOGGER.debug("Pods {}/{} did not roll. Must remain stable for: {} second(s)", namespaceName, pods.toString(),
+                        TestConstants.GLOBAL_STABILIZATION_TIME - i[0]);
+                    return i[0]++ == TestConstants.GLOBAL_STABILIZATION_TIME;
                 } else {
                     throw new RuntimeException(pods.toString() + " Pods are rolling!");
                 }
@@ -215,19 +209,19 @@ public class RollingUpdateUtils {
     public static void waitForNoKafkaRollingUpdate(String namespaceName, String clusterName, Map<String, String> brokerPods) {
         int[] i = {0};
 
-        LabelSelector brokerSelector = KafkaResource.getLabelSelector(clusterName, StrimziPodSetResource.getBrokerComponentName(clusterName));
+        LabelSelector brokerSelector = LabelSelectors.kafkaLabelSelector(clusterName, KafkaComponents.getBrokerPodSetName(clusterName));
 
         TestUtils.waitFor("Kafka Pods to remain stable and rolling update not to be triggered", TestConstants.GLOBAL_POLL_INTERVAL, TestConstants.GLOBAL_TIMEOUT,
             () -> {
                 boolean kafkaRolled = componentHasRolled(namespaceName, brokerSelector, brokerPods);
 
                 if (!kafkaRolled) {
-                    LOGGER.info("Kafka Pods did not roll. Must remain stable for: {} second(s)", TestConstants.GLOBAL_RECONCILIATION_COUNT - i[0]);
+                    LOGGER.info("Kafka Pods did not roll. Must remain stable for: {} second(s)", TestConstants.GLOBAL_STABILIZATION_TIME - i[0]);
                 } else {
                     throw new RuntimeException(brokerPods.toString() + " Pods are rolling!");
                 }
 
-                return i[0]++ == TestConstants.GLOBAL_RECONCILIATION_COUNT;
+                return i[0]++ == TestConstants.GLOBAL_STABILIZATION_TIME;
             }
         );
     }

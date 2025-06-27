@@ -65,9 +65,9 @@ public interface TestConstants {
     long CA_CERT_VALIDITY_DELAY = 10;
 
     // stability count ensures that after some reconciliation we have some additional time
-    int GLOBAL_STABILITY_OFFSET_COUNT = 20;
+    int GLOBAL_STABILITY_OFFSET_TIME = 20;
     // it is replacement instead of checking logs for reconciliation using dynamic waiting on some change for some period of time
-    int GLOBAL_RECONCILIATION_COUNT = (int) ((RECONCILIATION_INTERVAL / GLOBAL_POLL_INTERVAL) + GLOBAL_STABILITY_OFFSET_COUNT);
+    int GLOBAL_STABILIZATION_TIME = (int) ((RECONCILIATION_INTERVAL / GLOBAL_POLL_INTERVAL) + GLOBAL_STABILITY_OFFSET_TIME);
 
     long THROTTLING_EXCEPTION_TIMEOUT = Duration.ofMinutes(10).toMillis();
 
@@ -291,8 +291,10 @@ public interface TestConstants {
     String MIXED_POOL_SELECTOR_KEY = "MIXED_POOL_SELECTOR";
     String CONTROLLER_SELECTOR_KEY = "CONTROLLER_SELECTOR";
     String MIXED_SELECTOR_KEY = "MIXED_SELECTOR";
+    String EO_SELECTOR_KEY = "EO_SELECTOR";
     String KAFKA_CONNECT_SELECTOR_KEY = "KAFKA_CONNECT_SELECTOR";
     String MM2_SELECTOR_KEY = "MM2_SELECTOR";
+    String BRIDGE_SELECTOR_KEY = "BRIDGE_SELECTOR";
     String MESSAGE_COUNT_KEY = "MESSAGE_COUNT";
     String CONTINUOUS_MESSAGE_COUNT_KEY = "CONTINUOUS_MESSAGE_COUNT";
     String TEST_EXECUTION_START_TIME_KEY = "TEST_EXECUTION_START_TIME";
@@ -340,4 +342,14 @@ public interface TestConstants {
      */
     String DOCKER = "docker";
     String PODMAN = "podman";
+
+    /**
+     * OLM related constants
+     */
+    String OLM_OPERATOR_GROUP_NAME = "strimzi-group";
+
+    /**
+     * Label for Kubernetes worker nodes
+     */
+    String WORKER_NODE_LABEL = "node-role.kubernetes.io/worker";
 }
